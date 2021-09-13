@@ -21,7 +21,7 @@ class Request {
     }
     this.headers["Content-Length"] = this.bodyText.length;
   }
-  send(connection) {
+  send (connection) {
     return new Promise((resolve, reject) => {
       const parser = new ResponseParser();
       if (connection) {
@@ -48,11 +48,11 @@ class Request {
       });
     });
   }
-  toString() {
+  toString () {
     return `${this.method} ${this.path} HTTP/1.1\r
 ${Object.keys(this.headers)
-  .map((key) => `${key}: ${this.headers[key]}`)
-  .join("\r\n")}\r
+        .map((key) => `${key}: ${this.headers[key]}`)
+        .join("\r\n")}\r
 \r
 ${this.bodyText}`;
   }
@@ -75,17 +75,17 @@ class ResponseParser {
 
     this.bodyParser = null;
   }
-  receive(string) {
+  receive (string) {
     for (let i = 0; i < string.length; i++) {
       this.receiveChar(string.charAt(i));
     }
     console.log(this);
   }
 
-  get isFinished() {
+  get isFinished () {
     return this.bodyParser && this.bodyParser.isFinished;
   }
-  get response() {
+  get response () {
     this.statusLine.match(/HTTP\/1.1 ([0-9]+) ([\s\S]+)/);
     return {
       statusCode: RegExp.$1,
@@ -94,7 +94,7 @@ class ResponseParser {
       body: this.bodyParser.content.join(""),
     };
   }
-  receiveChar(char) {
+  receiveChar (char) {
     if (this.current === this.WAITING_STATUS_LINE) {
       if (char === "\r") {
         this.current = this.WAITING_STATUS_LINE_END;
@@ -155,7 +155,7 @@ class TrunkedBodyParser {
     this.isFinished = false;
     this.current = this.WAITING_LENGTH;
   }
-  receiveChar(char) {
+  receiveChar (char) {
     if (this.current === this.WAITING_LENGTH) {
       if (char === "\r") {
         if (this.length === 0) {
