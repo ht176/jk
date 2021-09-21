@@ -1,17 +1,25 @@
 const net = require("net");
-const parser = require("./parser");
 
+const parser = require("./parser.js"); // 导入parser
+const render = require("./render.js"); //
+const images = require("images"); //
+
+// http request class
 class Request {
+  // 收集必备的信息
   constructor(options) {
+    // set default value
     this.method = options.method || "GET";
     this.host = options.host;
     this.port = options.port || 80;
     this.path = options.path || "/";
-    this.body = options.body || {};
+    this.body = options.body || {}; // body is KV
     this.headers = options.headers || {};
+    // http must have Content-Type, set default value
     if (!this.headers["Content-Type"]) {
       this.headers["Content-Type"] = "application/x-www-form-urlencoded";
     }
+    // different content-type have different body types
     if (this.headers["Content-Type"] === "application/json") {
       this.bodyText = JSON.stringify(this.body);
     } else if (
@@ -21,23 +29,29 @@ class Request {
         .map((key) => `${key}=${encodeURIComponent(this.body[key])}`)
         .join("&");
     }
+    //
     this.headers["Content-Length"] = this.bodyText.length;
   }
-  send (connection) {
+
+  // 把真实请求发送到服务器，send函数是async，返回promise
+  send(connection) {
     return new Promise((resolve, reject) => {
       const parser = new ResponseParser();
       if (connection) {
         connection.write(this.toString());
       } else {
         connection = net.createConnection(
-          { host: this.host, port: this.port },
+          {
+            host: this.host,
+            port: this.port,
+          },
           () => {
             connection.write(this.toString());
           }
         );
       }
       connection.on("data", (data) => {
-        // console.log("data", data.toString());
+        console.log(data.toString());
         parser.receive(data.toString());
         if (parser.isFinished) {
           resolve(parser.response);
@@ -50,15 +64,24 @@ class Request {
       });
     });
   }
-  toString () {
-    return `${this.method} ${this.path} HTTP/1.1\r
-${Object.keys(this.headers)
+
+  toString() {
+    const CRLF = "\r\n";
+    const request = [
+      `${this.method} ${this.path} HTTP/1.1`,
+      CRLF,
+      `${Object.keys(this.headers)
         .map((key) => `${key}: ${this.headers[key]}`)
-        .join("\r\n")}\r
-\r
-${this.bodyText}`;
+        .join(CRLF)}`,
+      CRLF,
+      CRLF,
+      `${this.bodyText}`,
+    ];
+    return request.join("");
   }
 }
+
+// response的body根据content-type有不同的结构，可使用子parser的结构来解决问题
 class ResponseParser {
   constructor() {
     this.WAITING_STATUS_LINE = 0;
@@ -69,26 +92,20 @@ class ResponseParser {
     this.WAITING_HEADER_LINE_END = 5;
     this.WAITING_HEADER_BLOCK_END = 6;
     this.WAITING_BODY = 7;
+
     this.current = this.WAITING_STATUS_LINE;
     this.statusLine = "";
     this.headers = {};
     this.headerName = "";
     this.headerValue = "";
-
     this.bodyParser = null;
   }
-  receive (string) {
-    for (let i = 0; i < string.length; i++) {
-      this.receiveChar(string.charAt(i));
-    }
-    console.log(this);
-  }
-
-  get isFinished () {
+  get isFinished() {
     return this.bodyParser && this.bodyParser.isFinished;
   }
-  get response () {
-    this.statusLine.match(/HTTP\/1.1 ([0-9]+) ([\s\S]+)/);
+
+  get response() {
+    this.statusLine.match(/HTTP\/1.2([0-9]+)([\s\S]+)/);
     return {
       statusCode: RegExp.$1,
       statusText: RegExp.$2,
@@ -96,7 +113,12 @@ class ResponseParser {
       body: this.bodyParser.content.join(""),
     };
   }
-  receiveChar (char) {
+  receive(string) {
+    for (let i = 0; i < string.length; i++) {
+      this.receiveChar(string.charAt(i));
+    }
+  }
+  receiveChar(char) {
     if (this.current === this.WAITING_STATUS_LINE) {
       if (char === "\r") {
         this.current = this.WAITING_STATUS_LINE_END;
@@ -144,6 +166,7 @@ class ResponseParser {
     }
   }
 }
+
 class TrunkedBodyParser {
   constructor() {
     this.WAITING_LENGTH = 0;
@@ -151,26 +174,23 @@ class TrunkedBodyParser {
     this.READING_TRUNK = 2;
     this.WAITING_NEW_LINE = 3;
     this.WAITING_NEW_LINE_END = 4;
-    this.FINISH = 5;
     this.length = 0;
     this.content = [];
     this.isFinished = false;
     this.current = this.WAITING_LENGTH;
   }
-  receiveChar (char) {
+
+  receiveChar(char) {
     if (this.current === this.WAITING_LENGTH) {
       if (char === "\r") {
         if (this.length === 0) {
           this.isFinished = true;
-          this.current = this.FINISH;
-        } else {
-          this.current = this.WAITING_LENGTH_LINE_END;
         }
+        this.current = this.WAITING_LENGTH_LINE_END;
       } else {
         this.length *= 16;
         this.length += parseInt(char, 16);
       }
-    } else if (this.current === this.FINISH) {
     } else if (this.current === this.WAITING_LENGTH_LINE_END) {
       if (char === "\n") {
         this.current = this.READING_TRUNK;
@@ -192,6 +212,7 @@ class TrunkedBodyParser {
     }
   }
 }
+
 void (async function () {
   let request = new Request({
     method: "POST",
@@ -205,9 +226,15 @@ void (async function () {
       name: "Geoffrey",
     },
   });
+
   let response = await request.send();
   // console.log(response);
 
+  // 把返回值通过parse变成一个dom树
   let dom = parser.parseHTML(response.body);
-  return dom
+  // console.log(dom)
+
+  let viewport = images(800, 600);
+  render(viewport, dom);
+  viewport.save("viewport.jpg");
 })();
