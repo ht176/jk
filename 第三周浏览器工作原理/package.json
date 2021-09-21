@@ -1,12 +1,13 @@
 {
-  "name": "week02",
+  "name": "week03",
   "version": "1.0.0",
   "main": "server.js",
   "author": "Geoffrey",
   "license": "MIT",
   "repository": "https://github.com/ht176/jk.git",
   "dependencies": {
-    "css": "^3.0.0"
+    "css": "^3.0.0",
+    "images": "^3.2.3"
   },
   "scripts": {
     "serve": "node server.js"
